@@ -1,99 +1,80 @@
-const axios = require('axios');
-const crypto = require('crypto');
+const Razorpay = require('razorpay');
 const {
-  salt_key,
-  merchant_id,
+  RazorpayKeyId,
+  RazorpayKeySecreat,
   subscriptionAmount,
-  payemntRedirectUrl,
-  JWTScreatKey,
   frontendPaymentRedirectURL,
+  JWTScreatKey,
 } = require('../common/Constants');
 const { ErrorResponse } = require('../helper/response');
 const { errorMessage } = require('../common/StatusCodes');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
+// Initialize Razorpay instance
+const razorpay = new Razorpay({
+  key_id: RazorpayKeyId,
+  key_secret: RazorpayKeySecreat,
+});
+
 const makePayment = async (req, res) => {
   console.log('makePayment called');
   try {
-    let { transactionId, userId } = req.body;
-    const data = {
-      merchantId: merchant_id,
-      merchantTransactionId: transactionId,
-      name: "More Manoj Rajendra",
-      amount: subscriptionAmount * 100,
-      redirectUrl: `${payemntRedirectUrl}?id=${transactionId}&userId=${userId}`,
-      redirectMode: 'GET',
-      mobileNumber: "7040487891",
-      paymentInstrument: {
-        type: 'PAY_PAGE',
-      },
-    };
-    const payload = JSON.stringify(data);
-    const payloadMain = Buffer.from(payload).toString('base64');
-    const keyIndex = 1;
-    const string = payloadMain + '/pg/v1/pay' + salt_key;
-    const sha256 = crypto.createHash('sha256').update(string).digest('hex');
-    const checksum = sha256 + '###' + keyIndex;
-    const prod_URL = 'https://api.phonepe.com/apis/hermes/pg/v1/pay';
-    // const prod_URL = 'https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay';
+    const { transactionId, userId } = req.body;
+
     const options = {
-      method: 'POST',
-      url: prod_URL,
-      headers: {
-        accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-VERIFY': checksum,
-      },
-      data: {
-        request: payloadMain,
-      },
+      amount: subscriptionAmount * 100, // amount in the smallest currency unit (paise)
+      currency: "INR",
+      receipt: transactionId,
+      payment_capture: 1, // auto capture payment
+      notes: {
+        userId: userId,
+        transactionId: transactionId
+      }
     };
-    await axios(options)
-      .then(function (response) {
-        return res.json(response.data);
-      })
-      .catch(function (error) {
-        console.log('ghhhhhhhhhhhhhhhhhhh', error);
-      });
+
+    const order = await razorpay.orders.create(options);
+
+    res.json({
+      id: order.id,
+      currency: order.currency,
+      amount: order.amount,
+      key: RazorpayKeyId
+    });
+
   } catch (error) {
-    console.log('kkkkkkkkkkkkkk', error);
+    console.error('Error in makePayment:', error);
+    res.status(500).json({ error: 'Failed to create payment order' });
   }
 };
 
 const verifyPayemt = async (req, res) => {
-  const { id, userId } = req.query;
-  const merchantId = merchant_id;
-  const keyIndex = 1;
-  const string = `/pg/v1/status/${merchantId}/${id}` + salt_key;
-  const sha256 = crypto.createHash('sha256').update(string).digest('hex');
-  const checksum = sha256 + '###' + keyIndex;
-  const options = {
-    method: 'GET',
-    url: `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${id}`,
-    headers: {
-      accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-VERIFY': checksum,
-      'X-MERCHANT-ID': `${merchantId}`,
-    },
-  };
-  axios
-    .request(options)
-    .then(function (response) {
-      if (
-        response.data.success === true &&
-        response.data.code === 'PAYMENT_SUCCESS'
-      ) {
-        verifyPaymentSuccess({ userId, paymentInfo: response.data, req, res });
-      } else {
-        const url = `${frontendPaymentRedirectURL}/fail`;
-        return res.redirect(url);
-      }
-    })
-    .catch(function (error) {
-      console.log(error);
-    });
+  try {
+    const { payment_id, order_id, userId } = req.query;
+
+    // Verify payment with Razorpay
+    const payment = await razorpay.payments.fetch(payment_id);
+
+    if (payment.status === 'captured') {
+      verifyPaymentSuccess({
+        userId,
+        paymentInfo: {
+          success: true,
+          code: 'PAYMENT_SUCCESS',
+          paymentDetails: payment
+        },
+        req,
+        res
+      });
+    } else {
+      const url = `${frontendPaymentRedirectURL}/fail`;
+      return res.redirect(url);
+    }
+  } catch (error) {
+    console.error('Error in verifyPayemt:', error);
+    const url = `${frontendPaymentRedirectURL}/fail`;
+    return res.redirect(url);
+  }
 };
 
 const verifyPaymentSuccess = ({ userId, paymentInfo, req, res }) => {
@@ -115,9 +96,8 @@ const verifyPaymentSuccess = ({ userId, paymentInfo, req, res }) => {
           message: errorMessage.USER_NOT_FOUND,
         });
       }
-      const redirectUrl = `${frontendPaymentRedirectURL}/validate?token=${
-        data?.token
-      }&type=${paymentInfo.code === 'PAYMENT_SUCCESS' ? 1 : 0}`;
+      const redirectUrl = `${frontendPaymentRedirectURL}/validate?token=${data?.token
+        }&type=${paymentInfo.code === 'PAYMENT_SUCCESS' ? 1 : 0}`;
       return res.redirect(redirectUrl);
     })
     .catch(error => {

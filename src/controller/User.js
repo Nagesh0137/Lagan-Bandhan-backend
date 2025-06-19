@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const { JWTScreatKey } = require('../common/Constants');
+const { JWTScreatKey, skipPayment } = require('../common/Constants');
 const { SuccessResponse, ErrorResponse } = require('../helper/response');
 const { errorMessage } = require('../common/StatusCodes');
 const fs = require('fs');
@@ -126,17 +126,32 @@ const login = (req, res) => {
             });
           }
         });
-      }
+      }      // Payment validation - only check if skipPayment is false
+      if (!skipPayment) {
+        if (!userData[0]?.paymentInfo) {
+          return new ErrorResponse(res, {
+            message: 'Payment required. Please complete your subscription payment to access the platform.',
+            paymentRequired: true,
+          });
+        }
 
-      // Comment out payment check for development - uncomment for production
-      /*
-      if (!userData[0]?.paymentInfo) {
-        return new ErrorResponse(res, {
-          message:
-            'There seems to be an issue with your payment. Please reach out to our customer support for assistance.',
-        });
+        // Check if payment was successful for both Razorpay and PhonePe
+        const paymentInfo = userData[0]?.paymentInfo;
+        const isRazorpaySuccess = paymentInfo?.status === 'succeeded';
+        const isPhonePeSuccess = paymentInfo?.code === 'PAYMENT_SUCCESS';
+        const isPaymentCaptured = paymentInfo?.paymentDetails?.status === 'captured';
+
+        if (!isRazorpaySuccess && !isPhonePeSuccess && !isPaymentCaptured) {
+          console.log('Payment verification failed for user:', userData[0]._id);
+          console.log('PaymentInfo:', JSON.stringify(paymentInfo, null, 2));
+          return new ErrorResponse(res, {
+            message: 'Payment verification failed. Please complete your payment or contact support if payment was made.',
+            paymentRequired: true,
+          });
+        }
+
+        console.log('Payment verification successful for user:', userData[0]._id);
       }
-      */
 
       const id = userData[0]._id.toString();
       console.log('Login successful for user ID:', id);
