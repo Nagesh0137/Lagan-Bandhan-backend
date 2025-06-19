@@ -15,6 +15,7 @@ router.post('/deleteUserProfile', User.deleteUserProfile);
 router.post('/checkEmail', User.checkEmail);
 router.post('/verifyOTP', User.verifyOTP);
 router.post('/changeForgotPassword', User.changeForgotPassword);
+router.post('/getByMobile', User.getUserByMobile);
 router.post('/makePayment', PhonePay.makePayment);
 router.get('/verifyPayment', PhonePay.verifyPayemt);
 

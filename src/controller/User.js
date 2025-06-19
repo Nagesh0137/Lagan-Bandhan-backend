@@ -409,6 +409,30 @@ const changeForgotPassword = (req, res) => {
     });
 };
 
+const getUserByMobile = (req, res) => {
+  try {
+    const mobileNumber = req.body?.mobileNumber?.toString();
+
+    if (!mobileNumber) {
+      return new ErrorResponse(res, {
+        message: 'Mobile number is required',
+      });
+    }
+
+    return User.findOne({ mobileNumber: mobileNumber }).then((userData) => {
+      if (!userData) {
+        return new ErrorResponse(res, {
+          message: 'User not found',
+        });
+      } else {
+        return new SuccessResponse(res, userData);
+      }
+    });
+  } catch (error) {
+    return new ErrorResponse(res, error);
+  }
+};
+
 module.exports = {
   createNewUser,
   updateUser,
@@ -420,4 +444,5 @@ module.exports = {
   checkEmail,
   verifyOTP,
   changeForgotPassword,
+  getUserByMobile,
 };
