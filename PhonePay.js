@@ -29,7 +29,7 @@ app.post('/order', async (req, res) => {
       merchantTransactionId: merchantTransactionId,
       name: req.body.name,
       amount: 1,
-      redirectUrl: `http://localhost:8000/status?id=${merchantTransactionId}`,
+      redirectUrl: `https://lagnbandhan.cloudjiffy.net/status?id=${merchantTransactionId}`,
       redirectMode: 'POST',
       mobileNumber: req.body.phone,
       paymentInstrument: {
@@ -99,10 +99,10 @@ app.get('/status', async (req, res) => {
     .request(options)
     .then(function (response) {
       if (response.data.success === true) {
-        const url = 'http://localhost:5173/success';
+        const url = 'https://your-frontend-domain.com/success';
         return res.redirect(url);
       } else {
-        const url = 'http://localhost:5173/fail';
+        const url = 'https://your-frontend-domain.com/fail';
         return res.redirect(url);
       }
     })

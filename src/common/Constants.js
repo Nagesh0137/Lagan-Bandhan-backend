@@ -6,7 +6,7 @@ const RazorpayKeyId = 'rzp_live_RVVSDnjM9ShqQ3'; // Your live Razorpay key
 const RazorpayKeySecreat = 'PMUcJ6F23QIilqf5cqmcumcc'; // Your live Razorpay secret
 
 const subscriptionAmount = 251;
-const frontendPaymentRedirectURL = 'http://localhost:3000/auth';
+const frontendPaymentRedirectURL = 'https://jeevansobati.com/auth';
 const skipPayment = false; // Set to true to skip payment validation for development
 
 module.exports = {
